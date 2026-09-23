@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Admin Dashboard{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<main class="page">
+  <section class="page-heading"><span class="eyebrow">ADMIN CONTROL CENTER</span><h1>Community Operations Dashboard</h1><p>Monitor reports, activity, response progress and community engagement.</p></section>
+  <section class="stats-grid">
+    <div class="stat-card"><span>Total Issues</span><strong>{{ metrics.issues }}</strong></div>
+    <div class="stat-card"><span>Resolved</span><strong>{{ metrics.resolved }}</strong></div>
+    <div class="stat-card"><span>Registered Users</span><strong>{{ metrics.users }}</strong></div>
+    <div class="stat-card"><span>Comments</span><strong>{{ metrics.comments }}</strong></div>
+  </section>
+  <section class="chart-grid">
+    <div class="card chart-card"><h3>Issues by Category</h3><canvas id="categoryChart"></canvas></div>
+    <div class="card chart-card"><h3>Issues by Status</h3><canvas id="statusChart"></canvas></div>
+    <div class="card chart-card wide"><h3>Reports Over Time</h3><canvas id="monthChart"></canvas></div>
+  </section>
+  <section class="card table-card">
+    <div class="section-heading-row compact"><div><span class="eyebrow">LATEST ACTIVITY</span><h2>Recent Reports</h2></div><a class="btn btn-secondary" href="{{ url_for('view_issues') }}">View All Issues</a></div>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Issue</th><th>Category</th><th>Status</th><th>Support</th><th>Reporter</th><th></th></tr></thead><tbody>{% for i in recent %}<tr><td>#{{ i.issue_id }}</td><td>{{ i.title }}</td><td>{{ i.category }}</td><td><span class="status status-{{ i.status }}">{{ i.status|replace('_',' ')|title }}</span></td><td>{{ i.upvotes }}</td><td>{{ i.reporter_name }}</td><td><a href="{{ url_for('issue_detail', issue_id=i.issue_id) }}">Open →</a></td></tr>{% else %}<tr><td colspan="7">No reports yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+const categoryLabels={{ by_category|map(attribute='category')|list|tojson }}; const categoryValues={{ by_category|map(attribute='total')|list|tojson }};
+const statusLabels={{ by_status|map(attribute='status')|list|tojson }}; const statusValues={{ by_status|map(attribute='total')|list|tojson }};
+const monthLabels={{ by_month|map(attribute='month')|list|tojson }}; const monthValues={{ by_month|map(attribute='total')|list|tojson }};
+const textColor=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#64748b';
+new Chart(document.getElementById('categoryChart'),{type:'doughnut',data:{labels:categoryLabels,datasets:[{data:categoryValues}]},options:{responsive:true,plugins:{legend:{labels:{color:textColor}}}}});
+new Chart(document.getElementById('statusChart'),{type:'doughnut',data:{labels:statusLabels.map(x=>x.replace('_',' ')),datasets:[{data:statusValues}]},options:{responsive:true,plugins:{legend:{labels:{color:textColor}}}}});
+new Chart(document.getElementById('monthChart'),{type:'line',data:{labels:monthLabels,datasets:[{label:'Reports',data:monthValues,tension:.3,fill:true}]},options:{responsive:true,scales:{x:{ticks:{color:textColor}},y:{beginAtZero:true,ticks:{color:textColor}}},plugins:{legend:{labels:{color:textColor}}}}});
+</script>
+{% endblock %}

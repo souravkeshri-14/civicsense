@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Community Issues{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="page hero-inner">
+    <span class="hero-badge">COMMUNITY • REPORT • IMPROVE</span>
+    <h1>Turn local problems into visible action.</h1>
+    <p>Report civic problems, discover what is happening nearby, support community reports, and track progress from Open to Resolved.</p>
+    <div class="hero-actions">
+      {% if is_logged_in %}<a class="btn btn-light" href="{{ url_for('report') }}">🚨 Report an Issue</a>{% else %}<a class="btn btn-light" href="{{ url_for('login', next='/report') }}">🔐 Login to Report</a>{% endif %}
+      <a class="btn btn-ghost-light" href="{{ url_for('map_view') }}">🗺️ Explore the Map</a>
+    </div>
+  </div>
+</section>
+
+<main class="page" id="issues">
+  <section class="stats-grid issue-stats">
+    <div class="stat-card"><span>Total Reports</span><strong>{{ totals.total or 0 }}</strong></div>
+    <div class="stat-card"><span>Not Opened</span><strong>{{ totals.not_opened_count or 0 }}</strong></div>
+    <div class="stat-card"><span>Open</span><strong>{{ totals.open_count or 0 }}</strong></div>
+    <div class="stat-card"><span>In Progress</span><strong>{{ totals.progress_count or 0 }}</strong></div>
+    <div class="stat-card"><span>Resolved</span><strong>{{ totals.resolved_count or 0 }}</strong></div>
+  </section>
+
+  <section class="card filter-card">
+    <form class="filters" method="get" action="{{ url_for('view_issues') }}">
+      <input name="q" value="{{ filters.q }}" placeholder="Search title or description...">
+      <select name="category"><option value="">All categories</option>{% for c in categories %}<option value="{{ c }}" {% if filters.category==c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+      <select name="status"><option value="">All statuses</option><option value="not_opened" {% if filters.status=='not_opened' %}selected{% endif %}>Not Opened</option><option value="open" {% if filters.status=='open' %}selected{% endif %}>Open</option><option value="in_progress" {% if filters.status=='in_progress' %}selected{% endif %}>In Progress</option><option value="resolved" {% if filters.status=='resolved' %}selected{% endif %}>Resolved</option></select>
+      <button class="btn btn-primary" type="submit">Filter</button>
+      {% if filters.q or filters.category or filters.status %}<a class="btn btn-secondary" href="{{ url_for('view_issues') }}">Clear</a>{% endif %}
+    </form>
+  </section>
+
+  <section class="section-heading-row">
+    <div><span class="eyebrow">LIVE COMMUNITY MAP</span><h2>Where issues are happening</h2></div>
+    <a class="btn btn-secondary" href="{{ url_for('map_view') }}">Open Full Map →</a>
+  </section>
+  <div class="card map-card"><div class="map-shell"><div class="map-loading" id="issueMapLoading">Loading map…</div><div id="issueMap"></div></div></div>
+
+  <section class="section-heading-row compact">
+    <div><span class="eyebrow">COMMUNITY REPORTS</span><h2>Recent Civic Issues</h2></div>
+  </section>
+
+  {% if issues %}
+    {% for issue in issues %}
+    <article class="issue-card">
+      <div class="issue-top">
+        <div>
+          <a class="issue-title link-clean" href="{{ url_for('issue_detail', issue_id=issue.issue_id) }}">{{ issue.title }}</a>
+          <span class="category">{{ issue.category }}</span>
+        </div>
+        <span class="status status-{{ issue.status }}">{{ issue.status|replace('_',' ')|title }}</span>
+      </div>
+      <p class="description">{{ issue.description }}</p>
+      <div class="issue-meta">
+        <span>👍 {{ issue.upvotes or 0 }} support</span>
+        <span>💬 {{ issue.comment_count or 0 }} comments</span>
+        <span>📅 {{ issue.created_at.strftime('%d %b %Y, %I:%M %p') if issue.created_at else '' }}</span>
+        {% if issue.has_image %}<span>📷 Evidence photo</span>{% endif %}
+        {% if issue.latitude and issue.longitude %}<span>📍 {{ '%.5f'|format(issue.latitude) }}, {{ '%.5f'|format(issue.longitude) }}</span>{% endif %}
+      </div>
+      <div class="issue-actions">
+        <a class="btn btn-secondary" href="{{ url_for('issue_detail', issue_id=issue.issue_id) }}">View Details</a>
+        {% if is_logged_in %}
+          <form method="post" action="{{ url_for('upvote', issue_id=issue.issue_id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit">👍 Support</button></form>
+        {% else %}<a class="btn btn-primary" href="{{ url_for('login', next=url_for('issue_detail', issue_id=issue.issue_id)) }}">Login to Support</a>{% endif %}
+        {% if issue.latitude and issue.longitude %}<a class="btn btn-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query={{ issue.latitude }},{{ issue.longitude }}">📍 Maps</a>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  {% else %}
+    <div class="card empty"><h3>No issues match your filters.</h3><p>Try clearing filters or report the first issue in your community.</p></div>
+  {% endif %}
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  const mapEl = document.getElementById('issueMap');
+  if (!mapEl || typeof L === 'undefined') return;
+  const items = {{ map_issues|tojson }};
+  const map = L.map(mapEl, { scrollWheelZoom: true, zoomControl: true });
+  const defaultCenter = [23.3441, 85.3096];
+  map.setView(defaultCenter, 5.5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const colors = {not_opened:'#64748b', open:'#dc2626', in_progress:'#f59e0b', resolved:'#16a34a'};
+  function markerIcon(status){
+    return L.divIcon({
+      className:'custom-marker',
+      html:`<span style="background:${colors[status]||'#2563eb'}"></span>`,
+      iconSize:[22,22],
+      iconAnchor:[11,11]
+    });
+  }
+  function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+
+  const bounds=[];
+  items.forEach(i=>{
+    const marker=L.marker([i.latitude,i.longitude],{icon:markerIcon(i.status)}).addTo(map);
+    marker.bindPopup(`
+      <div style="min-width:180px">
+        <strong>${escapeHtml(i.title)}</strong><br>
+        <small>${escapeHtml(i.category)} • ${escapeHtml(i.status.replace('_',' '))}</small><br>
+        <a href="/issue/${i.issue_id}">View issue →</a>
+      </div>`);
+    bounds.push([i.latitude,i.longitude]);
+    if(i.accuracy && i.accuracy > 0){
+      L.circle([i.latitude,i.longitude],{radius:i.accuracy,color:colors[i.status]||'#2563eb',fillColor:colors[i.status]||'#2563eb',fillOpacity:.07,weight:1}).addTo(map);
+    }
+  });
+
+  if(bounds.length===1) map.setView(bounds[0],16);
+  if(bounds.length>1) map.fitBounds(bounds,{padding:[30,30],maxZoom:16});
+  setTimeout(()=>{ map.invalidateSize(true); document.getElementById('issueMapLoading')?.remove(); },150);
+  window.addEventListener('resize',()=>map.invalidateSize(true));
+})();
+</script>
+{% endblock %}

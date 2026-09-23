@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | {{ 'Admin Login' if admin_mode else 'Login' }}{% endblock %}
+{% block content %}
+<main class="auth-page">
+  <section class="auth-card">
+    <div class="auth-icon">{{ '🛡️' if admin_mode else '🔐' }}</div>
+    <div class="auth-heading">
+      <span class="eyebrow">{{ 'ADMIN PORTAL' if admin_mode else 'COMMUNITY ACCOUNT' }}</span>
+      <h1>{{ 'Administrator Login' if admin_mode else 'Welcome Back' }}</h1>
+      <p>{{ 'Manage issue status, history, comments and reports.' if admin_mode else 'Report issues, support reports and join the community.' }}</p>
+    </div>
+    <form method="post" class="auth-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <div class="field"><label>Email</label><input type="email" name="email" autocomplete="username" required></div>
+      <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary btn-full" type="submit">{{ 'Login as Admin' if admin_mode else 'Login' }}</button>
+    </form>
+    {% if admin_mode %}
+      <div class="auth-footer"><a href="{{ url_for('login') }}">User login</a></div>
+    {% else %}
+      <div class="auth-footer">New here? <a href="{{ url_for('register') }}">Create an account</a></div>
+      <div class="auth-footer"><a href="{{ url_for('admin_login') }}">Administrator login</a></div>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

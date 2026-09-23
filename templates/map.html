@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Issue Map{% endblock %}
+{% block head %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
+{% block content %}
+<main class="page">
+  <section class="page-heading"><span class="eyebrow">GEO-TAGGED REPORTS</span><h1>Interactive Issue Map</h1><p>Explore reported issues by their saved GPS coordinates. You can also center the map on your current device location.</p></section>
+  <div class="map-toolbar"><button class="btn btn-secondary" id="locateMe" type="button">📍 Locate Me</button><span id="mapStatus" class="muted">Loading issue locations...</span></div>
+  <div class="card"><div id="fullMap"></div></div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  const map = L.map('fullMap', { preferCanvas: true, zoomControl: true, scrollWheelZoom: true }).setView([20.5937,78.9629],5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors',detectRetina:true}).addTo(map);
+  const colors={not_opened:'#64748b',open:'#dc2626',in_progress:'#f59e0b',resolved:'#16a34a'};
+  const statusLabel={not_opened:'Not Opened',open:'Open',in_progress:'In Progress',resolved:'Resolved'};
+  const status=document.getElementById('mapStatus');
+  let userMarker=null, userCircle=null;
+  function icon(s){return L.divIcon({className:'custom-marker',html:`<span style="background:${colors[s]||'#2563eb'}"></span>`,iconSize:[22,22],iconAnchor:[11,11]});}
+  function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c]));}
+  fetch('{{ url_for("issues_api") }}', {cache:'no-store'}).then(r=>{if(!r.ok) throw new Error('Unable to load issues'); return r.json();}).then(items=>{
+    const bounds=[];
+    items.forEach(i=>{
+      const lat=Number(i.latitude), lon=Number(i.longitude);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)) return;
+      const m=L.marker([lat,lon],{icon:icon(i.status)}).addTo(map);
+      const acc=i.accuracy ? `<br><small>GPS accuracy ±${Math.round(i.accuracy)} m</small>` : '';
+      m.bindPopup(`<strong>${esc(i.title)}</strong><br>${esc(i.category)} · ${esc(statusLabel[i.status]||i.status)}${acc}<br><a href="/issue/${i.issue_id}">View details →</a>`);
+      if(i.accuracy && i.accuracy > 0) L.circle([lat,lon],{radius:Number(i.accuracy),color:colors[i.status]||'#2563eb',fillOpacity:.08,weight:1}).addTo(map);
+      bounds.push([lat,lon]);
+    });
+    if(bounds.length){ map.fitBounds(bounds,{padding:[40,40],maxZoom:16}); status.textContent=`${bounds.length} mapped issue${bounds.length===1?'':'s'} loaded.`; }
+    else { status.textContent='No issues with a saved GPS location yet.'; }
+    setTimeout(()=>map.invalidateSize(true),150);
+  }).catch(()=>{status.textContent='Could not load issue locations.';});
+
+  document.getElementById('locateMe').addEventListener('click',()=>{
+    if(!navigator.geolocation){status.textContent='Geolocation is not supported by this browser.';return;}
+    status.textContent='Finding your device location...';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const lat=pos.coords.latitude, lon=pos.coords.longitude, accuracy=pos.coords.accuracy;
+      if(userMarker) userMarker.setLatLng([lat,lon]); else userMarker=L.marker([lat,lon],{title:'Your location'}).addTo(map);
+      userMarker.bindPopup(`<strong>Your current location</strong><br>Accuracy ±${Math.round(accuracy)} m`).openPopup();
+      if(userCircle) userCircle.setLatLng([lat,lon]).setRadius(accuracy); else userCircle=L.circle([lat,lon],{radius:accuracy,color:'#2563eb',fillColor:'#60a5fa',fillOpacity:.14}).addTo(map);
+      map.setView([lat,lon],17,{animate:true});
+      status.textContent=`Your location found (accuracy ±${Math.round(accuracy)} m).`;
+    },()=>{status.textContent='Location permission was not granted.';},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  });
+  window.addEventListener('resize',()=>map.invalidateSize(true));
+})();
+</script>
+{% endblock %}

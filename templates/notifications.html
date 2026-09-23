@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Notifications{% endblock %}
+{% block content %}
+<main class="page">
+  <section class="page-heading-row"><div><span class="eyebrow">ACTIVITY</span><h1>Notifications</h1><p class="muted">Status changes and community activity related to your reports.</p></div><form method="post" action="{{ url_for('notifications_read_all') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="btn btn-secondary" type="submit">Mark all read</button></form></section>
+  <section class="card notifications-list">
+    {% for n in notifications %}
+      <article class="notification {% if not n.is_read %}unread{% endif %}"><div class="notification-icon">{{ '✅' if n.notification_type=='status_change' else '💬' }}</div><div class="notification-body"><strong>{{ n.title }}</strong><p>{{ n.message }}</p><small>{{ n.created_at.strftime('%d %b %Y, %I:%M %p') if n.created_at else '' }}</small></div><div>{% if not n.is_read %}<form method="post" action="{{ url_for('notification_read', notification_id=n.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="icon-button" title="Mark read">✓</button></form>{% endif %}{% if n.issue_id %}<a class="icon-button" href="{{ url_for('issue_detail', issue_id=n.issue_id) }}">↗</a>{% endif %}</div></article>
+    {% else %}<div class="empty"><h3>You are all caught up.</h3><p>No notifications yet.</p></div>{% endfor %}
+  </section>
+</main>
+{% endblock %}

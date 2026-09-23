@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CIVICSENSE - report, discover and track civic issues in your community.">
+  <title>{% block title %}CIVICSENSE{% endblock %}</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<nav class="navbar">
+  <a class="brand-link" href="{{ url_for('view_issues') }}">
+    <div class="brand-mark">🏙️</div>
+    <div><strong>CIVICSENSE</strong><small>Community intelligence</small></div>
+  </a>
+  <div class="nav-links">
+    <a href="{{ url_for('view_issues') }}">Issues</a>
+    <a href="{{ url_for('map_view') }}">Map</a>
+    {% if is_logged_in %}
+      <a href="{{ url_for('report') }}">Report</a>
+      <a href="{{ url_for('notifications') }}" class="nav-notifications">🔔{% if unread_notifications %}<span class="notification-badge">{{ unread_notifications }}</span>{% endif %}</a>
+      {% if is_admin %}<a href="{{ url_for('admin_dashboard') }}" class="admin-nav">Dashboard</a>{% endif %}
+      <span class="user-pill">{{ current_user }}</span>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}" class="nav-primary">Sign Up</a>
+      <a href="{{ url_for('admin_login') }}" class="nav-admin">Admin</a>
+    {% endif %}
+    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">🌙</button>
+  </div>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-wrap">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+<footer class="footer">
+  <strong>CIVICSENSE</strong>
+  <span>Report • Discover • Improve</span>
+</footer>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

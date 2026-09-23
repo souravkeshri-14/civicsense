@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Sign Up{% endblock %}
+{% block content %}
+<main class="auth-page">
+  <section class="auth-card wide">
+    <div class="auth-icon">👤</div>
+    <div class="auth-heading">
+      <span class="eyebrow">JOIN CIVICSENSE</span>
+      <h1>Create Your Account</h1>
+      <p>Join your community and help make local issues visible.</p>
+    </div>
+    <form method="post" class="auth-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="grid-2">
+        <div class="field"><label>Name</label><input name="name" maxlength="150" required></div>
+        <div class="field"><label>Phone <span class="muted">(optional)</span></label><input name="phone" maxlength="30"></div>
+      </div>
+      <div class="field"><label>Email</label><input type="email" name="email" maxlength="255" required></div>
+      <div class="field"><label>Password</label><input type="password" name="password" minlength="6" autocomplete="new-password" required></div>
+      <button class="btn btn-primary btn-full" type="submit">Create Account</button>
+    </form>
+    <div class="auth-footer">Already registered? <a href="{{ url_for('login') }}">Login</a></div>
+  </section>
+</main>
+{% endblock %}

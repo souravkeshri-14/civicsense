@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}CIVICSENSE | Report Issue{% endblock %}
+{% block content %}
+<main class="page form-page">
+  <header class="page-heading">
+    <span class="eyebrow">CIVIC REPORTING</span>
+    <h1>Report a Civic Issue</h1>
+    <p>Give your community enough detail to understand the problem and its exact location.</p>
+  </header>
+
+  <section class="card">
+    <form method="post" action="{{ url_for('report_issue') }}" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="grid-2">
+        <div class="field"><label>Issue Title</label><input name="title" maxlength="255" placeholder="Large pothole near main road" required></div>
+        <div class="field"><label>Category</label>
+          <select name="category" required>
+            <option value="">Select category</option><option>Road</option><option>Garbage</option><option>Streetlight</option><option>Water</option><option>Drainage</option><option>Public Safety</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Description</label><textarea name="description" maxlength="4000" placeholder="Explain what is happening, where it is, and why it matters..." required></textarea></div>
+      <div class="field"><label>Evidence Photo <span class="muted">(optional, max 4 MB)</span></label><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></div>
+
+      <div class="location-box">
+        <div class="location-title">📍 Pick the exact issue location</div>
+        <p class="muted location-help">We first detect your device location. You can then click on the map or drag the pin to the exact spot.</p>
+        <div class="location-actions">
+          <button type="button" class="btn btn-secondary" id="useMyLocation">📍 Use My Location</button>
+          <span id="locationStatus" class="muted">Waiting for location...</span>
+        </div>
+        <div id="reportMap" class="location-picker-map"></div>
+        <div id="coords" class="coords">No location selected.</div>
+        <input type="hidden" name="latitude" id="latitude">
+        <input type="hidden" name="longitude" id="longitude">
+        <input type="hidden" name="location_accuracy" id="location_accuracy">
+      </div>
+
+      <button class="btn btn-primary btn-full" type="submit">🚨 Submit Civic Issue</button>
+    </form>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  const map = L.map('reportMap', { zoomControl: true, scrollWheelZoom: true }).setView([20.5937, 78.9629], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker = null;
+  let accuracyCircle = null;
+  const latInput = document.getElementById('latitude');
+  const lonInput = document.getElementById('longitude');
+  const accInput = document.getElementById('location_accuracy');
+  const coords = document.getElementById('coords');
+  const status = document.getElementById('locationStatus');
+
+  function setPoint(lat, lon, accuracy, zoom = 17) {
+    lat = Number(lat); lon = Number(lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    accuracy = Number.isFinite(Number(accuracy)) ? Math.max(0, Number(accuracy)) : null;
+    latInput.value = lat.toFixed(8);
+    lonInput.value = lon.toFixed(8);
+    accInput.value = accuracy === null ? '' : accuracy.toFixed(2);
+    coords.textContent = `Latitude: ${lat.toFixed(6)} · Longitude: ${lon.toFixed(6)}${accuracy === null ? '' : ` · GPS accuracy: ±${Math.round(accuracy)} m`}`;
+    if (!marker) {
+      marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+      marker.on('dragend', function () {
+        const pos = marker.getLatLng();
+        setPoint(pos.lat, pos.lng, accuracy, 18);
+        status.textContent = 'Pin moved — exact issue location updated.';
+      });
+    } else {
+      marker.setLatLng([lat, lon]);
+    }
+    marker.bindPopup('<strong>Selected issue location</strong><br>Drag the pin or click the map to adjust it.');
+    if (accuracy && accuracy > 0) {
+      if (!accuracyCircle) accuracyCircle = L.circle([lat, lon], { radius: accuracy, color: '#2563eb', fillColor: '#60a5fa', fillOpacity: 0.12, weight: 1 }).addTo(map);
+      else accuracyCircle.setLatLng([lat, lon]).setRadius(accuracy);
+    } else if (accuracyCircle) {
+      accuracyCircle.setLatLng([lat, lon]).setRadius(0);
+    }
+    map.setView([lat, lon], zoom, { animate: true });
+  }
+
+  map.on('click', function (event) {
+    setPoint(event.latlng.lat, event.latlng.lng, null, 18);
+    status.textContent = 'Location selected manually on the map.';
+  });
+
+  function locate() {
+    if (!navigator.geolocation) {
+      status.textContent = 'Geolocation is not supported by this browser. Click the map to set the location.';
+      return;
+    }
+    status.textContent = 'Requesting high-accuracy device location...';
+    navigator.geolocation.getCurrentPosition(function (position) {
+      setPoint(position.coords.latitude, position.coords.longitude, position.coords.accuracy, 18);
+      status.textContent = 'GPS location detected. Drag the pin if needed.';
+    }, function () {
+      status.textContent = 'GPS permission was not granted. Click the map to select the exact location.';
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  }
+
+  document.getElementById('useMyLocation').addEventListener('click', locate);
+  map.whenReady(function () { setTimeout(() => map.invalidateSize(true), 150); });
+  window.addEventListener('resize', () => map.invalidateSize(true));
+  locate();
+})();
+</script>
+{% endblock %}
